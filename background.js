@@ -22,7 +22,8 @@ let meetingState = {
   participants: [],
   initialParticipants: [],
   lateJoiners: [],
-  timeline: []
+  timeline: [],
+  audioActive: false
 };
 
 let processingInterval = null;
@@ -221,7 +222,8 @@ function getStateSnapshot() {
     participants: meetingState.participants,
     lateJoiners: meetingState.lateJoiners,
     timeline: meetingState.timeline,
-    transcriptCount: meetingState.transcript.length
+    transcriptCount: meetingState.transcript.length,
+    audioActive: meetingState.audioActive || false
   };
 }
 
@@ -237,7 +239,7 @@ function resetState() {
     topics: [], decisions: [], actionItems: [],
     currentTopic: '', sentiment: 'neutral', keyInsights: [],
     questionsRaised: [], participants: [], initialParticipants: [],
-    lateJoiners: [], timeline: []
+    lateJoiners: [], timeline: [], audioActive: false
   };
 }
 
@@ -250,16 +252,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       meetingState.meetingId = message.meetingId;
       meetingState.startTime = Date.now();
       meetingState.timeline.push({ event: 'Meeting started', timestamp: Date.now(), elapsed: 0 });
+      meetingState.audioActive = false;
       
-      // Start audio capture
-      if (sender.tab?.id) {
-        startAudioCapture(sender.tab.id);
-      }
-      
-      // Start periodic AI processing (every 30 seconds)
-      processingInterval = setInterval(processTranscript, 30000);
+      // Periodic AI processing will only start when audio starts (or we can start it now)
+      // processingInterval = setInterval(processTranscript, 30000);
       
       broadcastState();
+      sendResponse({ success: true });
+      break;
+    }
+
+    case 'START_AUDIO': {
+      if (meetingState.isActive) {
+        chrome.tabs.query({ url: "https://meet.google.com/*" }, (tabs) => {
+          if (tabs.length > 0) {
+            startAudioCapture(tabs[0].id);
+            meetingState.audioActive = true;
+            if (!processingInterval) {
+              processingInterval = setInterval(processTranscript, 30000);
+            }
+            broadcastState();
+          }
+        });
+      }
       sendResponse({ success: true });
       break;
     }
