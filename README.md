@@ -26,10 +26,9 @@ We designed this with a **local-first philosophy**: all meeting data is processe
 ## 🚀 Key Features
 
 * **Invisible & Native:** Uses modern Chrome `tabCapture` and Offscreen APIs to intercept audio securely without adding bots to the participant list.
-* **Local-First & Private:** All sessions are saved directly to your browser's local storage. You decide whether to save or discard data after a meeting.
-* **Voice Activity Detection (VAD):** Smart audio recording skips prolonged silence, saving bandwidth and transcription costs.
-* **Live Dashboards:** See real-time transcription tracking, topic identification, sentiment analysis, and action items.
-* **Late-Joiner Briefings:** Instantly catches up late participants with targeted, private overlay briefings summarizing what they missed.
+* **Contextual Transcription:** Leverages Whisper's prompt-injection to maintain continuity and accuracy across conversation chunks.
+* **Late-Joiner Briefings:** Instantly catches up late participants with targeted, private overlays summarizing missed context via hardened UI automation.
+* **Proactive Intelligence:** Automatically detects meetings and initializes host-first (1+N) participant tracking for accurate reporting.
 * **Bring Your Own Key (BYOK):** Full control over your data. Supply your own OpenAI API key for transcription and summarization tasks.
 * **Premium Interface:** A visually striking deep-monochrome UI with glassmorphism effects, smooth animations, and zero clutter. 
 
@@ -39,13 +38,11 @@ We designed this with a **local-first philosophy**: all meeting data is processe
 
 The extension is built natively on Manifest V3 using vanilla JavaScript to minimize bloat and maximize execution speed. 
 
-Here is how the distinct parts of the extension interact:
-
-1. **`background.js` (The Conductor):** Acts as the central state manager. It routes messages between the popup, the dashboard, the offscreen document, and the content script. It runs the main polling loop that drives the AI generation cycle and maintains the "Rolling Context Window" (the last 3 AI responses) to give the LLM continuity.
-2. **`offscreen.html` & `offscreen.js` (The Audio Engine):** Bypasses Manifest V3 restrictions on DOM media APIs by running a hidden offscreen document. It uses `chrome.tabCapture` to get the raw audio stream from Google Meet. We run a `Web Audio API AnalyserNode` here to implement **Voice Activity Detection (VAD)**. Audio is only chunked (every 8 seconds) and sent for transcription if the volume exceeds our RMS threshold.
-3. **`content.js` (The UI Injector):** Injects our custom UI elements (the floating Copilot button and the Briefing Overlay) directly into the Google Meet DOM. It isolates styles to prevent conflicts with Google's CSS and communicates exclusively via Chrome's messaging API.
-4. **`utils/api.js` & `utils/prompts.js` (The AI Layer):** Handles the network requests to OpenAI. We use Whisper for transcription (with the last transcription passed as a prompt for continuity) and dynamic GPT models (like `gpt-4o-mini`) for processing the text into structured json summaries of Topics, Actions, and Insights.
-5. **Session Management (`chrome.storage.local`):** No cloud databases. We use the browser's native local storage. At the end of a meeting, you are prompted to Save or Discard the meeting. Saved meetings viewable in the **Dashboard** side-panel, where they can be exported to Markdown or deleted.
+1. **`background.js` (The Conductor):** Acts as the central state manager. It proactively detects Meet tabs to initialize sessions and routes context-aware transcription prompts to Whisper for high-fidelity output.
+2. **`offscreen.html` & `offscreen.js` (The Audio Engine):** Runs a hidden offscreen document for `chrome.tabCapture`. It processes audio in chunks, ensuring zero data loss and satisfying Whisper's format requirements.
+3. **`content.js` (The UI Injector):** Injects floating buttons and briefing overlays. It features a hardened chat automation engine (`execCommand` based) to reliably deliver welcome messages to late joiners.
+4. **AI Intelligence Layer:** Uses Whisper for transcription and dynamic GPT models (like `gpt-4o-mini`) for processing text into structured insights, including Decisions, Action Items, and Strategic Sentiment.
+5. **Local Storage:** Securely stores session data in `chrome.storage.local`. After each meeting, you decide to Save or Discard—nothing leaves your browser without your consent.
 
 ---
 
