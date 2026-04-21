@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const noMeetingSection = document.getElementById('no-meeting-section');
   const sessionModal = document.getElementById('session-modal');
 
+  let lastState = null;
+
   // ——— Check if API key is configured ———
   const config = await chrome.storage.local.get(['openai_api_key']);
   
@@ -60,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const textEl = btn.querySelector('.copilot-btn-text');
     const originalText = textEl?.textContent || 'Start';
 
-    if (state.audioActive) {
+    if (lastState?.audioActive) {
       console.log('[LateMeet] Audio already active, skipping capture request.');
       return;
     }
@@ -195,19 +197,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     showSessionModal();
   }
 
-  // ——— Get Current State ———
+  // ——— Get Initial state load ———
   try {
-    const state = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
-    if (state) {
-      updateUI(state);
-    }
-  } catch {
-    // No active meeting
-  }
+    lastState = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
+    if (lastState) updateUI(lastState);
+  } catch { /* background script might be idle */ }
 
   // ——— Listen for State Updates ———
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'STATE_UPDATE') {
+      lastState = message.state;
       updateUI(message.state);
     }
     if (message.type === 'SESSION_ENDED') {
