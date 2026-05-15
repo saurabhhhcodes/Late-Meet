@@ -1,4 +1,4 @@
-import { collectParticipantNames, type ParticipantNameCandidate } from './participantDetection';
+import { collectParticipantNames, participantNameFromCandidate, type ParticipantNameCandidate } from './participantDetection.ts';
 
 (() => {
   const COPILOT_PREFIX = '[LateMeet]';
@@ -23,6 +23,7 @@ import { collectParticipantNames, type ParticipantNameCandidate } from './partic
     participantNodes: [
       '[data-participant-id] [data-self-name]',
       '[data-participant-id] [role="heading"]',
+      '[data-participant-id] span[class="notranslate"]',
       '[data-participant-id][aria-label^="Participant:"]',
       '[data-self-name]', // The tile for the local user
       'div[jsname="NfX98"]', // Common class for names on video tiles
@@ -166,27 +167,35 @@ import { collectParticipantNames, type ParticipantNameCandidate } from './partic
     }, 8000);
   }
 
-  function collectParticipants(): string[] {
+  function collectParticipants(): { participants: string[]; selfName: string | null } {
     const candidates: ParticipantNameCandidate[] = [];
+    const showEveryoneBtn = document.querySelector(SELECTORS.showEveryoneBtn) as HTMLElement | null;
+    if (showEveryoneBtn) showEveryoneBtn.click();
+
+    const participantElements = new Set<HTMLElement>();
+    let selfName: string | null = null;
 
     for (const selector of SELECTORS.participantNodes) {
       document.querySelectorAll(selector).forEach(node => {
-        const element = node as HTMLElement;
-        candidates.push({
-          ariaLabel: element.getAttribute('aria-label'),
-          selfName: element.getAttribute('data-self-name'),
-          text: getTextValue(element)
-        });
+        participantElements.add(node as HTMLElement);
       });
     }
 
-    const selfNode = document.querySelector('[data-self-name]');
-    if (selfNode) {
-      const selfName = selfNode.getAttribute('data-self-name');
-      if (selfName) candidates.push({ selfName });
+    for (const element of participantElements) {
+      if (!selfName) {
+        const rawSelfName = element.getAttribute('data-self-name');
+        if (rawSelfName) {
+          selfName = participantNameFromCandidate({ selfName: rawSelfName });
+        }
+      }
+      candidates.push({
+        ariaLabel: element.getAttribute('aria-label'),
+        selfName: element.getAttribute('data-self-name'),
+        text: getTextValue(element)
+      });
     }
 
-    return collectParticipantNames(candidates);
+    return { participants: collectParticipantNames(candidates), selfName };
   }
 
   let participantPollTimer: number | NodeJS.Timeout | null = null;
@@ -195,12 +204,13 @@ import { collectParticipantNames, type ParticipantNameCandidate } from './partic
     if (participantPollTimer) return;
 
     participantPollTimer = setInterval(async () => {
-      const participants = collectParticipants();
+      const { participants, selfName } = collectParticipants();
 
       try {
         await chrome.runtime.sendMessage({
           type: 'PARTICIPANTS_UPDATED',
-          participants
+          participants,
+          selfName
         });
       } catch {
         // Service worker idle

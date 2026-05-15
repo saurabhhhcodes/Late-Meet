@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { collectParticipantNames, participantNameFromCandidate } from './participantDetection.ts';
+import { MAX_PARTICIPANT_NAME_LEN, collectParticipantNames, participantNameFromCandidate } from './participantDetection.ts';
 
 test('participant aria labels are converted into participant names', () => {
   assert.equal(
@@ -44,4 +44,35 @@ test('participant collection uses You only as a fallback', () => {
     ['Ada Lovelace']
   );
   assert.deepEqual(collectParticipantNames([]), ['You']);
+});
+
+test('participant name length allows exact max', () => {
+  const exact = 'a'.repeat(MAX_PARTICIPANT_NAME_LEN);
+  const tooLong = 'a'.repeat(MAX_PARTICIPANT_NAME_LEN + 1);
+
+  assert.equal(participantNameFromCandidate({ text: exact }), exact);
+  assert.equal(participantNameFromCandidate({ text: tooLong }), null);
+});
+
+test('participant names with ellipsis are ignored', () => {
+  assert.equal(participantNameFromCandidate({ text: 'Ada…' }), null);
+  assert.equal(participantNameFromCandidate({ text: 'Ada … Lovelace' }), null);
+});
+
+test('selfName is preferred over other text sources', () => {
+  assert.equal(
+    participantNameFromCandidate({
+      selfName: 'Ada Lovelace',
+      text: 'Grace Hopper',
+      ariaLabel: 'Participant: Marie Curie'
+    }),
+    'Ada Lovelace'
+  );
+});
+
+test('concatenated text strips control labels', () => {
+  assert.equal(
+    participantNameFromCandidate({ text: 'Ada Lovelace Mute More options Pin' }),
+    'Ada Lovelace'
+  );
 });

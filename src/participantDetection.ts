@@ -25,9 +25,22 @@ function cleanText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function stripExcludedLabels(value: string): string {
+  let cleaned = cleanText(value);
+  if (!cleaned) return '';
+
+  for (const label of EXCLUDED_PARTICIPANT_LABELS) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    cleaned = cleaned.replace(regex, ' ');
+  }
+
+  return cleanText(cleaned);
+}
+
 export function participantNameFromCandidate(candidate: ParticipantNameCandidate): string | null {
   const selfName = cleanText(candidate.selfName || '');
-  const text = cleanText(candidate.text || '');
+  const text = stripExcludedLabels(candidate.text || '');
   const ariaLabel = cleanText(candidate.ariaLabel || '');
 
   const participantAriaName = ariaLabel.startsWith('Participant:')
@@ -36,7 +49,7 @@ export function participantNameFromCandidate(candidate: ParticipantNameCandidate
   const rawName = selfName || participantAriaName || text;
   const name = cleanText(rawName);
 
-  if (!name || name.length >= MAX_PARTICIPANT_NAME_LEN || name.includes('…')) {
+  if (!name || name.length > MAX_PARTICIPANT_NAME_LEN || name.includes('…')) {
     return null;
   }
 
@@ -55,6 +68,6 @@ export function collectParticipantNames(candidates: ParticipantNameCandidate[]):
     if (name) names.add(name);
   }
 
-  const participantNames = [...names].filter(name => name.length > 0);
+  const participantNames = [...names];
   return participantNames.length > 0 ? participantNames : ['You'];
 }

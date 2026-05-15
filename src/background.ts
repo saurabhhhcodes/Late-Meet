@@ -40,6 +40,12 @@ const state: State = {
   participantCount: 0
 };
 
+let selfParticipantName: string | null = null;
+
+function normalizeParticipantName(value: string | null | undefined): string {
+  return String(value || '').trim().toLowerCase();
+}
+
 function resetState() {
   state.isActive = false;
   state.meetingId = null;
@@ -63,6 +69,7 @@ function resetState() {
   state.lastSummarizedAt = 0;
   state.pendingJoiners.clear();
   state.participantCount = 0;
+  selfParticipantName = null;
 }
 
 function addTimeline(event: string) {
@@ -401,9 +408,28 @@ function detectNewJoiners(currentList: string[]) {
     return [];
   }
 
+  const hasPlaceholderOnly =
+    state.initialParticipants.length === 0 &&
+    state.participants.length === 1 &&
+    state.participants[0] === 'You';
+
+  if (hasPlaceholderOnly) {
+    const next = Array.isArray(currentList) ? currentList : [];
+    if (next.length > 0 && !(next.length === 1 && next[0] === 'You')) {
+      state.initialParticipants = [...next];
+      state.participants = [...next];
+      state.participantCount = next.length;
+      return [];
+    }
+  }
+
+  const normalizedSelf = normalizeParticipantName(selfParticipantName);
   const next = Array.isArray(currentList) ? currentList : [];
   const newJoiners = next.filter(
-    p => !state.participants.includes(p) && !state.initialParticipants.includes(p)
+    p =>
+      !state.participants.includes(p) &&
+      !state.initialParticipants.includes(p) &&
+      (!normalizedSelf || normalizeParticipantName(p) !== normalizedSelf)
   );
 
   if (newJoiners.length > 0) {
@@ -470,9 +496,18 @@ async function sendChatToTab(tabId: number, text: string) {
 async function maybeWelcomeJoiners(tabId: number | undefined, joiners: string[]) {
   if (!joiners.length || getDuration() <= MIN_MEETING_DURATION_FOR_WELCOME || !tabId) return;
 
+  const normalizedSelf = normalizeParticipantName(selfParticipantName);
+
   for (const joiner of joiners) {
     const name = String(joiner || '').trim();
-    if (!name || name.includes('You') || state.pendingJoiners.has(name)) continue;
+    if (
+      !name ||
+      name.includes('You') ||
+      (normalizedSelf && normalizeParticipantName(name) === normalizedSelf) ||
+      state.pendingJoiners.has(name)
+    ) {
+      continue;
+    }
 
     state.pendingJoiners.add(name);
     try {
@@ -752,6 +787,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: false, error: 'participants must be an array' });
           return;
         }
+
+        const incomingSelfName = typeof message.selfName === 'string' ? message.selfName.trim() : '';
+        if (incomingSelfName) selfParticipantName = incomingSelfName;
 
         const joiners = detectNewJoiners(message.participants);
         await maybeWelcomeJoiners(sender?.tab?.id || state.targetTabId || undefined, joiners);
