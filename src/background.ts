@@ -409,7 +409,8 @@ function detectNewJoiners(currentList: string[]) {
   }
 
   const hasPlaceholderOnly =
-    state.initialParticipants.length === 0 &&
+    (state.initialParticipants.length === 0 ||
+      (state.initialParticipants.length === 1 && state.initialParticipants[0] === 'You')) &&
     state.participants.length === 1 &&
     state.participants[0] === 'You';
 
@@ -500,10 +501,11 @@ async function maybeWelcomeJoiners(tabId: number | undefined, joiners: string[])
 
   for (const joiner of joiners) {
     const name = String(joiner || '').trim();
+    const normalizedName = normalizeParticipantName(name);
     if (
       !name ||
-      name.includes('You') ||
-      (normalizedSelf && normalizeParticipantName(name) === normalizedSelf) ||
+      normalizedName === normalizeParticipantName('You') ||
+      (normalizedSelf && normalizedName === normalizedSelf) ||
       state.pendingJoiners.has(name)
     ) {
       continue;

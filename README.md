@@ -75,12 +75,13 @@ The extension is built natively on Manifest V3 using **TypeScript and Vite 5** f
 * **For Regular Users:** You only need the compiled `dist/` folder. This is the actual, ready-to-use extension.  
 * **For Developers:** The `src/` folder contains the raw TypeScript/source code. You must compile it first using the steps below.
 > [!WARNING]
+> **Practical minimum: Chrome 116+**
 > **Prerequisites (Chrome minimums):**
 > - Manifest V3: Chrome 88+
 > - Offscreen Documents (`chrome.offscreen`): Chrome 109+ (MV3+)
 > - `chrome.tabCapture.getMediaStreamId`: Chrome 71+
-> - Stream IDs used in offscreen documents without `consumerTabId`: Chrome 116+
 > - Side Panel API (`chrome.sidePanel`): Chrome 114+ (`chrome.sidePanel.open` requires Chrome 116+)
+> **Developer note:** Offscreen document stream ID usage requires Chrome 116+ when not tied to a consumer tab.
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/shouri123/Late-Meet.git

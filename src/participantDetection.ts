@@ -35,6 +35,8 @@ function stripExcludedLabels(value: string): string {
     cleaned = cleaned.replace(regex, ' ');
   }
 
+  cleaned = cleaned.replace(/(^|\s)[-/]+(?=\s|$)/g, ' ');
+
   return cleanText(cleaned);
 }
 

@@ -76,3 +76,21 @@ test('concatenated text strips control labels', () => {
     'Ada Lovelace'
   );
 });
+
+test('label stripping handles mute/unmute variants', () => {
+  assert.equal(participantNameFromCandidate({ text: 'Unmute' }), null);
+  assert.equal(participantNameFromCandidate({ text: 'Ada Lovelace Unmute' }), 'Ada Lovelace');
+  assert.equal(participantNameFromCandidate({ text: 'Ada Lovelace Muted' }), 'Ada Lovelace');
+  assert.equal(participantNameFromCandidate({ text: 'Ada Lovelace Mute Unmute' }), 'Ada Lovelace');
+});
+
+test('label stripping tolerates separators and mixed case', () => {
+  assert.equal(participantNameFromCandidate({ text: 'Ada Lovelace - MUTE' }), 'Ada Lovelace');
+  assert.equal(participantNameFromCandidate({ text: 'Ada Lovelace / unMuTe' }), 'Ada Lovelace');
+  assert.equal(participantNameFromCandidate({ text: 'Muted' }), null);
+});
+
+test('label stripping does not remove embedded words', () => {
+  assert.equal(participantNameFromCandidate({ text: 'Mutee Johnson' }), 'Mutee Johnson');
+  assert.equal(participantNameFromCandidate({ text: 'Unmuteable Ada' }), 'Unmuteable Ada');
+});

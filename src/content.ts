@@ -167,10 +167,13 @@ import { collectParticipantNames, participantNameFromCandidate, type Participant
     }, 8000);
   }
 
-  function collectParticipants(): { participants: string[]; selfName: string | null } {
+  async function collectParticipants(): Promise<{ participants: string[]; selfName: string | null }> {
     const candidates: ParticipantNameCandidate[] = [];
     const showEveryoneBtn = document.querySelector(SELECTORS.showEveryoneBtn) as HTMLElement | null;
-    if (showEveryoneBtn) showEveryoneBtn.click();
+    if (showEveryoneBtn) {
+      showEveryoneBtn.click();
+      await wait(200);
+    }
 
     const participantElements = new Set<HTMLElement>();
     let selfName: string | null = null;
@@ -204,7 +207,7 @@ import { collectParticipantNames, participantNameFromCandidate, type Participant
     if (participantPollTimer) return;
 
     participantPollTimer = setInterval(async () => {
-      const { participants, selfName } = collectParticipants();
+      const { participants, selfName } = await collectParticipants();
 
       try {
         await chrome.runtime.sendMessage({
