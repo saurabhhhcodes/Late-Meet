@@ -94,7 +94,6 @@ async function flushAudioChunk() {
     if (!voiceActivity.consumeShouldFlush()) {
       return;
     }
-
     await drainPendingChunks();
 
   try {
@@ -200,9 +199,7 @@ async function startCapture(streamId: string, _tabId: number, includeMicrophone 
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     console.log(
       '[LateMeet][offscreen] Capture already running. Mic active:',
-      Boolean(microphoneStream),
-      '| MIME:',
-      mediaRecorder.mimeType || 'default'
+      Boolean(microphoneStream)
     );
     return {
       microphoneActive: Boolean(microphoneStream)
