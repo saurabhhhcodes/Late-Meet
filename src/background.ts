@@ -581,7 +581,9 @@ async function startAudioCapture(
 
   await ensureOffscreenDocument();
 
-  if (!state.isActive) {
+  const createdSession = !state.isActive;
+
+  if (createdSession) {
     resetState();
     state.isActive = true;
     state.startTime = Date.now();
@@ -630,6 +632,10 @@ async function startAudioCapture(
     await broadcastStateUpdate();
   } catch (err) {
     state.audioActive = false;
+    if (createdSession) {
+      resetState();
+      await broadcastStateUpdate();
+    }
     throw err;
   }
 }
