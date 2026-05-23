@@ -822,7 +822,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function exportSessionMarkdown(session: State) {
+  function generateSessionMarkdown(session: State): string {
     let md = `# Meeting Summary\n\n`;
     md += `**Date:** ${new Date((session as any).savedAt || session.startTime).toLocaleString()}\n`;
     md += `**Duration:** ${formatDuration(session.duration || 0)}\n`;
@@ -851,6 +851,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         md += "\n";
       });
     }
+    return md;
+  }
+
+  function exportSessionMarkdown(session: State) {
+    const md = generateSessionMarkdown(session);
 
     navigator.clipboard
       .writeText(md)
@@ -864,35 +869,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
       });
   }
-  function downloadSessionMarkdown(session: State) {
-    let md = `# Meeting Summary\n\n`;
-    md += `**Date:** ${new Date((session as any).savedAt || session.startTime).toLocaleString()}\n`;
-    md += `**Duration:** ${formatDuration(session.duration || 0)}\n`;
-    md += `**Meeting ID:** ${session.meetingId || "N/A"}\n`;
-    md += `**Participants:** ${session.participants?.join(", ") || "N/A"}\n\n`;
-    md += `## Summary\n${session.summary || "N/A"}\n\n`;
 
-    if (session.topics?.length) {
-      md += `## Topics\n`;
-      session.topics.forEach((t: Topic) => (md += `- ${t.name} (${t.status})\n`));
-      md += "\n";
-    }
-    if (session.decisions?.length) {
-      md += `## Decisions\n`;
-      session.decisions.forEach(
-        (d: Decision) => (md += `- ${d.text}${d.by ? ` — ${d.by}` : ""}\n`),
-      );
-      md += "\n";
-    }
-    if (session.actionItems?.length) {
-      md += `## Action Items\n`;
-      session.actionItems.forEach((a: ActionItem) => {
-        md += `- [ ] ${a.task}`;
-        if (a.owner) md += ` → ${a.owner}`;
-        if (a.deadline) md += ` (due: ${a.deadline})`;
-        md += "\n";
-      });
-    }
+  function downloadSessionMarkdown(session: State) {
+    const md = generateSessionMarkdown(session);
 
     const filename = `meeting-summary-${new Date((session as any).savedAt || session.startTime).toISOString().slice(0, 10)}.md`;
     downloadFile(md, filename, "text/markdown");
