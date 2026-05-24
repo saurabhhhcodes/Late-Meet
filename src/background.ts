@@ -527,15 +527,17 @@ function notifyNewActionItems(items: ActionItem[]) {
       title: "New Action Item",
       message,
       priority: 1,
+    chrome.notifications.create(notifId, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("src/icons/icon128.png"),
+      title: "New Action Item",
+      message,
+      priority: 1,
     }, () => {
       if (!chrome.runtime.lastError) {
         notifiedActionItems.add(key);
       }
     });
-      iconUrl: chrome.runtime.getURL("src/icons/icon128.png"),
-      title: "New Action Item",
-      message,
-      priority: 1,
     });
   }
 }
