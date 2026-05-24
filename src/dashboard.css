@@ -524,9 +524,6 @@ body::-webkit-scrollbar-thumb,
 .action-checkbox:hover {
   border-color: #fafafa;
   background: #171717;
-.action-check:hover {
-  border-color: var(--text-main);
-  background: var(--bg-card);
 }
 
 .action-checkbox:checked {
