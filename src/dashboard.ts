@@ -913,8 +913,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     md += `## Key Insights\n`;
     if (state.keyInsights?.length) {
-      state.keyInsights.forEach((i: string) => (md += `- ${i}\n`));
-      md += "\n";
+      state.keyInsights?.forEach((i) => {
+        const text = typeof i === "string" ? i : i.text || "";
+        md += `- ${text}\n`;
+      });
     } else {
       md += `_No insights available_\n\n`;
     }
