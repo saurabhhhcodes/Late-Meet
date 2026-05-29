@@ -171,9 +171,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const tabId = (tab as HTMLElement).dataset.tab;
       if (!tabId) return;
 
-      tabs.forEach((t) => t.classList.remove("active"));
+      tabs.forEach((t) => {
+        t.classList.remove("active");
+        t.setAttribute("aria-selected", "false");
+      });
       panels.forEach((p) => p.classList.remove("active"));
       (tab as HTMLElement).classList.add("active");
+      (tab as HTMLElement).setAttribute("aria-selected", "true");
 
       const panel = document.getElementById(`tab-${tabId}`);
       if (panel) {
