@@ -1143,7 +1143,8 @@ body::-webkit-scrollbar-thumb,
 
 .search-match.active {
   background-color: #34d399;
-  color: #000;
+  color: #000000;
+}
 /* ——— History Modal & UI ——— */
 .session-item.expanded .session-item-summary {
   display: block;
