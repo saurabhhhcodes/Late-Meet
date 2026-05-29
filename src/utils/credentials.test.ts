@@ -73,7 +73,7 @@ test("getApiCredentials returns plaintext from session when available", async ()
 });
 
 test("getApiCredentials decrypts local credentials when session is empty", async () => {
-  const { session, local } = setupChromeStorage();
+  const { session } = setupChromeStorage();
 
   // Save first — this populates both session (plaintext) and local (encrypted)
   await saveApiCredentials({ openai_api_key: "persisted-key" });
