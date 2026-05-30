@@ -23,8 +23,3 @@ updates:
       github-actions:
         patterns:
           - "*"
-updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "daily"
