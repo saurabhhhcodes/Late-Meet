@@ -16,11 +16,11 @@ import assert from "node:assert/strict";
 
 type TabUpdatedCallback = (
   tabId: number,
-  changeInfo: chrome.tabs.OnUpdatedInfo,
+  changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ) => Promise<void>;
 
-type TabActivatedCallback = (activeInfo: chrome.tabs.OnActivatedInfo) => Promise<void>;
+type TabActivatedCallback = (activeInfo: chrome.tabs.TabActiveInfo) => Promise<void>;
 
 interface CapturedListeners {
   onUpdated?: TabUpdatedCallback;
