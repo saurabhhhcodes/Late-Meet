@@ -78,7 +78,7 @@ export async function getStorageStats(): Promise<StorageStats> {
     if (chrome.storage.local.getBytesInUse) {
       chrome.storage.local.getBytesInUse(null, resolve);
     } else {
-      resolve(Object.values(allItems).reduce((sum, v) => sum + roughBytes(v), 0));
+      resolve(Object.values(allItems).reduce((sum: number, v: unknown) => sum + roughBytes(v), 0));
     }
   });
 
