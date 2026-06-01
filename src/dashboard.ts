@@ -5,6 +5,7 @@ import {
   TimelineEvent,
   Decision,
   ActionItem,
+  SummaryItem,
   KeyInsight,
 } from "./types";
 import { initTheme } from "./theme.js";
@@ -469,7 +470,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Summary
     const summaryEl = document.getElementById("dash-summary");
-    if (summaryEl) summaryEl.textContent = state.summary || "Waiting for conversation to begin...";
+    if (summaryEl) {
+      if (Array.isArray(state.summaryItems) && state.summaryItems.length > 0) {
+        summaryEl.innerHTML = state.summaryItems
+          .map((item) => {
+            const label = escapeHtml(item.timestampLabel || item.timestamp || "00:00");
+            const timestampChunk = item.chunkId
+              ? `<button type="button" class="timestamp-link" data-chunk-id="${escapeHtml(
+                  item.chunkId,
+                )}" aria-label="Jump to transcript at ${label}">${label}</button>`
+              : `<span class="timestamp-text">${label}</span>`;
+            return `
+              <div class="summary-item">
+                <div class="summary-text">${escapeHtml(item.text || "")}</div>
+                <div class="summary-meta">${timestampChunk}</div>
+              </div>
+            `;
+          })
+          .join("");
+      } else {
+        summaryEl.textContent = state.summary || "Waiting for conversation to begin...";
+      }
+    }
 
     // Current Topic
     const topicEl = document.getElementById("dash-current-topic");
@@ -521,6 +543,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Transcript Tab
     if (loadedTabs.has("transcript")) updateTranscript(state.transcript);
+    attachTimestampLinkListeners();
   }
 
   // ——— Sentiment ———
@@ -635,14 +658,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     container.innerHTML = decisions
-      .map(
-        (d) => `
+      .map((d) => {
+        const label = escapeHtml(d.timestampLabel || d.timestamp || "00:00");
+        const timestampChunk = d.chunkId
+          ? `<button type="button" class="timestamp-link" data-chunk-id="${escapeHtml(
+              d.chunkId,
+            )}" aria-label="Jump to transcript at ${label}">${label}</button>`
+          : d.timestamp
+            ? ` <span class="timestamp-text">${escapeHtml(d.timestamp)}</span>`
+            : "";
+
+        return `
       <div class="decision-item">
         <div class="decision-text">${escapeHtml(d.text || "")} ${d.classification === "tentative" ? '<span style="font-size: 11px; background: #FEF3C7; color: #D97706; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Tentative</span>' : ""}</div>
-        <div class="decision-meta">${d.by ? `By ${escapeHtml(d.by)}` : ""} ${d.timestamp ? `• ${escapeHtml(d.timestamp)}` : ""}</div>
+        <div class="decision-meta">${d.by ? `By ${escapeHtml(d.by)}` : ""}${timestampChunk ? ` • ${timestampChunk}` : ""}</div>
       </div>
-    `,
-      )
+    `;
+      })
       .join("");
   }
 
@@ -715,6 +747,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         deadlineDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon" style="margin-right:2px"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line></svg>`;
         deadlineDiv.appendChild(document.createTextNode(deadline));
         label.appendChild(deadlineDiv);
+      }
+
+      const timestampLabel = a.timestampLabel || a.timestamp;
+      if (timestampLabel) {
+        const timestampButton = document.createElement("button");
+        timestampButton.type = "button";
+        timestampButton.className = "timestamp-link";
+        timestampButton.textContent = timestampLabel;
+        timestampButton.setAttribute("aria-label", `Jump to transcript at ${timestampLabel}`);
+        if (a.chunkId) {
+          timestampButton.dataset.chunkId = a.chunkId;
+          timestampButton.dataset.hasListener = "true";
+        } else {
+          timestampButton.disabled = true;
+          timestampButton.classList.add("timestamp-text");
+        }
+        label.appendChild(timestampButton);
       }
 
       checkbox.addEventListener("change", () => {
@@ -876,9 +925,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     transcriptContainer.innerHTML = transcript
       .map((entry) => {
-        const timestamp = entry.timestamp || Date.now();
-        const elapsed = Math.round((timestamp - startTime) / 1000);
-        const timeStr = formatDuration(elapsed);
+        const timeStr = escapeHtml(entry.timestampLabel || formatDuration(entry.timestamp || 0));
         const speaker = escapeHtml(entry.speaker || "Unknown");
         const initials = speaker
           .split(" ")
@@ -889,9 +936,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           .slice(0, 2);
         const isAudio = (entry.speaker || "") === "Audio";
         const text = escapeHtml(entry.text || "");
+        const chunkId = entry.id ? `transcript-${escapeHtml(entry.id)}` : "";
 
         return `
-        <div class="transcript-entry ${isAudio ? "audio-source" : ""}">
+        <div id="${chunkId}" class="transcript-entry ${isAudio ? "audio-source" : ""}">
           <div class="transcript-time">${timeStr}</div>
           <div class="transcript-avatar">${isAudio ? "🎙" : initials}</div>
           <div class="transcript-body">
@@ -909,6 +957,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
       updateTranscriptSearchControls();
     }
+  }
+
+  function navigateToTranscriptChunk(chunkId: string) {
+    const transcriptEl = document.getElementById(`transcript-${chunkId}`);
+    if (!transcriptEl) return;
+    transcriptEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlightTranscriptChunk(transcriptEl);
+  }
+
+  function highlightTranscriptChunk(element: HTMLElement) {
+    element.classList.add("transcript-highlight");
+    window.setTimeout(() => {
+      element.classList.remove("transcript-highlight");
+    }, 4000);
+  }
+
+  function attachTimestampLinkListeners() {
+    document.querySelectorAll<HTMLButtonElement>(".timestamp-link").forEach((button) => {
+      const chunkId = button.dataset.chunkId;
+      if (!chunkId) return;
+      if (button.dataset.hasListener) return;
+      button.addEventListener("click", () => navigateToTranscriptChunk(chunkId));
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          navigateToTranscriptChunk(chunkId);
+        }
+      });
+      button.dataset.hasListener = "true";
+    });
   }
 
   // ——— Unified Export Helper (Handles both Live & History) ———
