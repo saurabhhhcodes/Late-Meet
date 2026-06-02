@@ -81,7 +81,9 @@ async function pruneSessionsForQuota(
     if (session) pruned.push(session);
   }
 
-  let currentBytes = await getBytesInUse(storage, null);
+  // Measure only session-related keys, not all of chrome.storage.local
+  const sessionKeys = [SAVED_SESSION_INDEX_KEY, ...index.map((s) => getSavedSessionKey(s.id))];
+  let currentBytes = await getBytesInUse(storage, sessionKeys);
   while (
     currentBytes > 0 &&
     currentBytes + incomingBytes > STORAGE_SOFT_LIMIT_BYTES &&
@@ -156,6 +158,11 @@ export async function persistMeetingSession(
     [SAVED_SESSION_INDEX_KEY]: nextIndex,
   });
 
+  // One-time cleanup: remove legacy sessions key after successful migration
+  if (Array.isArray(values[SAVED_SESSIONS_LEGACY_KEY])) {
+    await storage.remove(SAVED_SESSIONS_LEGACY_KEY);
+  }
+
   return pendingSession;
 }
 
@@ -176,6 +183,22 @@ export async function getSavedMeetingSessions(storage: StorageArea): Promise<Sto
   return Array.isArray(values[SAVED_SESSIONS_LEGACY_KEY])
     ? (values[SAVED_SESSIONS_LEGACY_KEY].map(asStoredSession).filter(Boolean) as StoredSession[])
     : [];
+}
+
+export async function getSavedMeetingSession(
+  storage: StorageArea,
+  sessionId: string,
+): Promise<StoredSession | null> {
+  const sessionKey = getSavedSessionKey(sessionId);
+  const values = await storage.get([sessionKey, SAVED_SESSIONS_LEGACY_KEY]);
+  const indexedSession = asStoredSession(values[sessionKey]);
+  if (indexedSession) return indexedSession;
+
+  const legacySessions = Array.isArray(values[SAVED_SESSIONS_LEGACY_KEY])
+    ? (values[SAVED_SESSIONS_LEGACY_KEY].map(asStoredSession).filter(Boolean) as StoredSession[])
+    : [];
+
+  return legacySessions.find((session) => session.id === sessionId) ?? null;
 }
 
 export async function deleteSavedMeetingSession(

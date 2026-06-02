@@ -47,7 +47,23 @@ initTheme();
     ],
     activeSpeakerIndicators: [
       '[aria-label*="speaking" i]',
+      '[aria-label*="hablando" i]',
+      '[aria-label*="parle" i]',
+      '[aria-label*="spricht" i]',
+      '[aria-label*="falando" i]',
+      '[aria-label*="parlando" i]',
+      '[aria-label*="говорит" i]',
+      '[aria-label*="正在讲话" i]',
+      '[aria-label*="話しています" i]',
       '[data-tooltip*="speaking" i]',
+      '[data-tooltip*="hablando" i]',
+      '[data-tooltip*="parle" i]',
+      '[data-tooltip*="spricht" i]',
+      '[data-tooltip*="falando" i]',
+      '[data-tooltip*="parlando" i]',
+      '[data-tooltip*="говорит" i]',
+      '[data-tooltip*="正在讲话" i]',
+      '[data-tooltip*="話しています" i]',
       '[data-is-speaking="true"]',
       '[data-speaking="true"]',
       '[data-active-speaker="true"]',
@@ -90,7 +106,12 @@ initTheme();
 
   function hasActiveSpeakerCue(el: Element): boolean {
     const ariaLabel = String(el.getAttribute("aria-label") || "");
-    if (/\bspeaking\b/i.test(ariaLabel)) return true;
+    if (
+      /(speaking|hablando|parle|spricht|falando|parlando|говорит|正在讲话|話しています)/i.test(
+        ariaLabel,
+      )
+    )
+      return true;
 
     if (
       el.getAttribute("data-is-speaking") === "true" ||
@@ -556,6 +577,12 @@ initTheme();
   const observer = new MutationObserver(() => {
     if (window.location.pathname.length > 5 && !window.location.pathname.includes("/_")) {
       injectFloatingButton();
+      // Disconnect once the button is successfully injected. Re-injection after
+      // copilot stops is handled by the STATE_UPDATE message listener, so this
+      // observer is no longer needed.
+      if (document.getElementById("mc-float-btn")) {
+        observer.disconnect();
+      }
     }
   });
 
@@ -638,6 +665,15 @@ initTheme();
 
     // Don't handle unknown messages — let other listeners process them
     return false;
+  });
+
+  window.addEventListener("beforeunload", () => {
+    try {
+      // Fire-and-forget message to auto-save the session on tab close
+      chrome.runtime.sendMessage({ type: "SAVE_SESSION" }).catch(() => {});
+    } catch {
+      // Ignore errors during unload
+    }
   });
 
   startParticipantPolling();
