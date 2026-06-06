@@ -28,10 +28,12 @@ export function isValidAccent(value: string): boolean {
   const accent = value.trim();
   return (
     /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(accent) ||
-    /^(360|3[0-5]\d|[12]\d{2}|[1-9]\d|\d)\s*,\s*(100|[1-9]\d|\d)%\s*,\s*(100|[1-9]\d|\d)%$/.test(
+    /^(360|3[0-5]\d|[12]\d{2}|0*[1-9]\d|0*\d)\s*,\s*(100|0*[1-9]\d|0*\d)%\s*,\s*(100|0*[1-9]\d|0*\d)%$/.test(
       accent,
     ) ||
-    /^\d{1,3}\s+\d{1,3}%\s+\d{1,3}%$/.test(accent)
+    /^(360|3[0-5]\d|[12]\d{2}|0*[1-9]\d|0*\d)\s+(100|0*[1-9]\d|0*\d)%\s+(100|0*[1-9]\d|0*\d)%$/.test(
+      accent,
+    )
   );
 }
 
