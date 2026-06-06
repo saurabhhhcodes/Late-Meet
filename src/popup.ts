@@ -9,6 +9,7 @@ import {
 import { validateOpenAIKey } from "./utils/api.js";
 import { resolveManualMeetTab } from "./meetingTabs";
 import { startPopupAudioCapture } from "./popupCapture";
+import { escapeHtml } from "./utils/sanitize.js";
 
 initTheme();
 
