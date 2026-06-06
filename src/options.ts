@@ -12,6 +12,7 @@ interface Settings {
   vadThreshold?: number;
   aiModel?: string;
   lateJoinerBriefing?: boolean;
+  publicLateJoinerChat?: boolean;
   topicDetection?: boolean;
   decisionDetection?: boolean;
   actionExtraction?: boolean;
@@ -115,6 +116,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Feature toggles
   const toggles = [
     { id: "late-joiner-toggle", key: "lateJoinerBriefing" },
+    { id: "public-late-joiner-chat-toggle", key: "publicLateJoinerChat" },
     { id: "topic-toggle", key: "topicDetection" },
     { id: "decision-toggle", key: "decisionDetection" },
     { id: "action-toggle", key: "actionExtraction" },
@@ -123,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   ];
 
   // Keys that default to off (opt-in features)
-  const defaultOffKeys = new Set(["transcriptRefinement"]);
+  const defaultOffKeys = new Set(["publicLateJoinerChat", "transcriptRefinement"]);
 
   toggles.forEach((t) => {
     const el = document.getElementById(t.id) as HTMLInputElement | null;
@@ -312,6 +314,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         aiModel: (document.getElementById("ai-model") as HTMLSelectElement)?.value,
         lateJoinerBriefing: (document.getElementById("late-joiner-toggle") as HTMLInputElement)
           ?.checked,
+        publicLateJoinerChat: (
+          document.getElementById("public-late-joiner-chat-toggle") as HTMLInputElement
+        )?.checked,
         topicDetection: (document.getElementById("topic-toggle") as HTMLInputElement)?.checked,
         decisionDetection: (document.getElementById("decision-toggle") as HTMLInputElement)
           ?.checked,
