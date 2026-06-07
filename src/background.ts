@@ -240,6 +240,35 @@ let selfParticipantName: string | null = null;
 let stateHydrated = false;
 let hydrationPromise: Promise<void> | null = null;
 
+/**
+ * Guards against prototype pollution by blocking dangerous property names.
+ * Attackers who control chrome.storage contents (e.g. via stored-XSS or a
+ * malicious extension) could inject `__proto__`, `constructor`, or `prototype`
+ * keys into the persisted JSON to pollute Object.prototype.
+ */
+function isSafeMergeKey(key: string): boolean {
+  return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+}
+
+/**
+ * Returns a shallow clone of an array whose items are own-property-only
+ * plain objects, stripped of any prototype chain. This prevents stored
+ * objects with a crafted `__proto__` key from tainting the runtime state.
+ */
+function sanitizeStoredArray<T>(arr: unknown): T[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item) => {
+    if (item === null || typeof item !== "object") return item as T;
+    const safe = Object.create(null) as Record<string, unknown>;
+    for (const key of Object.keys(item as object)) {
+      if (isSafeMergeKey(key)) {
+        safe[key] = (item as Record<string, unknown>)[key];
+      }
+    }
+    return safe as unknown as T;
+  });
+}
+
 async function hydrateState() {
   if (stateHydrated) return;
   if (!hydrationPromise) {
@@ -247,29 +276,46 @@ async function hydrateState() {
       try {
         const data = await chrome.storage.local.get("activeMeetingState");
         const stored = data.activeMeetingState as Partial<State> | undefined;
-        if (stored && typeof stored === "object") {
-          // Validate structure before merging to prevent crashes from corrupted storage
-          if (Array.isArray(stored.transcript)) state.transcript = stored.transcript;
-          if (Array.isArray(stored.timeline)) state.timeline = stored.timeline;
-          if (Array.isArray(stored.topics)) state.topics = stored.topics;
-          if (Array.isArray(stored.decisions)) state.decisions = stored.decisions;
-          if (Array.isArray(stored.actionItems)) state.actionItems = stored.actionItems;
-          if (Array.isArray(stored.keyInsights)) state.keyInsights = stored.keyInsights;
+        // Guard: reject non-plain-object payloads (arrays, null, primitives).
+        if (
+          stored &&
+          typeof stored === "object" &&
+          !Array.isArray(stored) &&
+          isSafeMergeKey(String(Object.getPrototypeOf(stored)))
+        ) {
+          // Validate structure and sanitize arrays before merging to prevent
+          // prototype pollution from corrupted or maliciously crafted storage.
+          if (Array.isArray(stored.transcript))
+            state.transcript = sanitizeStoredArray(stored.transcript);
+          if (Array.isArray(stored.timeline)) state.timeline = sanitizeStoredArray(stored.timeline);
+          if (Array.isArray(stored.topics)) state.topics = sanitizeStoredArray(stored.topics);
+          if (Array.isArray(stored.decisions))
+            state.decisions = sanitizeStoredArray(stored.decisions);
+          if (Array.isArray(stored.actionItems))
+            state.actionItems = sanitizeStoredArray(stored.actionItems);
+          if (Array.isArray(stored.keyInsights))
+            state.keyInsights = sanitizeStoredArray(stored.keyInsights);
           if (Array.isArray(stored.unresolvedDiscussions))
-            state.unresolvedDiscussions = stored.unresolvedDiscussions;
-          if (Array.isArray(stored.contradictions)) state.contradictions = stored.contradictions;
-          if (Array.isArray(stored.questionsRaised)) state.questionsRaised = stored.questionsRaised;
-          if (Array.isArray(stored.participants)) state.participants = stored.participants;
+            state.unresolvedDiscussions = sanitizeStoredArray(stored.unresolvedDiscussions);
+          if (Array.isArray(stored.contradictions))
+            state.contradictions = sanitizeStoredArray(stored.contradictions);
+          if (Array.isArray(stored.questionsRaised))
+            state.questionsRaised = sanitizeStoredArray(stored.questionsRaised);
+          if (Array.isArray(stored.participants))
+            state.participants = sanitizeStoredArray(stored.participants);
           if (Array.isArray(stored.initialParticipants))
-            state.initialParticipants = stored.initialParticipants;
-          if (Array.isArray(stored.lateJoiners)) state.lateJoiners = stored.lateJoiners;
+            state.initialParticipants = sanitizeStoredArray(stored.initialParticipants);
+          if (Array.isArray(stored.lateJoiners))
+            state.lateJoiners = sanitizeStoredArray(stored.lateJoiners);
 
           if (typeof stored.isActive === "boolean") state.isActive = stored.isActive;
-          if (typeof stored.meetingId === "string") state.meetingId = stored.meetingId;
+          if (typeof stored.meetingId === "string" && isSafeMergeKey(stored.meetingId))
+            state.meetingId = stored.meetingId;
           if (typeof stored.meetingUrl === "string") state.meetingUrl = stored.meetingUrl;
           if (typeof stored.startTime === "number") state.startTime = stored.startTime;
           if (typeof stored.summary === "string") state.summary = stored.summary;
-          if (Array.isArray(stored.summaryItems)) state.summaryItems = stored.summaryItems;
+          if (Array.isArray(stored.summaryItems))
+            state.summaryItems = sanitizeStoredArray(stored.summaryItems);
           if (typeof stored.currentTopic === "string") state.currentTopic = stored.currentTopic;
           if (typeof stored.sentiment === "string") state.sentiment = stored.sentiment;
           if (typeof stored.audioActive === "boolean") state.audioActive = stored.audioActive;
