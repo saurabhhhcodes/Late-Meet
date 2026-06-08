@@ -22,6 +22,11 @@ function truncatedNoticeHtml(key: string, total: number | undefined): string {
   return `<div class="truncated-notice">Showing last ${UI_TRUNCATION_MAX} of ${total} ${key}</div>`;
 }
 
+function truncatedNoticeText(key: string, total: number | undefined): string {
+  if (total === undefined || total <= UI_TRUNCATION_MAX) return "";
+  return `Showing last ${UI_TRUNCATION_MAX} of ${total} ${key}`;
+}
+
 /** Securely checks whether a URL belongs to meet.google.com using URL parsing (not substring matching). */
 function isMeetHostname(url: string | null | undefined): boolean {
   if (!url) return false;
@@ -675,11 +680,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     container.innerHTML = "";
-    const noticeText = truncatedNoticeHtml("decisions", lastState?.truncatedCounts?.decisions);
+    const noticeText = truncatedNoticeText("decisions", lastState?.truncatedCounts?.decisions);
     if (noticeText) {
       const noticeDiv = document.createElement("div");
       noticeDiv.className = "truncated-notice";
-      noticeDiv.textContent = noticeText.replace(/<[^>]*>/g, "");
+      noticeDiv.textContent = noticeText;
       container.appendChild(noticeDiv);
     }
     decisions.forEach((d) => {
@@ -778,11 +783,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     container.innerHTML = "";
-    const noticeText = truncatedNoticeHtml("action items", lastState?.truncatedCounts?.actionItems);
+    const noticeText = truncatedNoticeText("action items", lastState?.truncatedCounts?.actionItems);
     if (noticeText) {
       const noticeDiv = document.createElement("div");
       noticeDiv.className = "truncated-notice";
-      noticeDiv.textContent = noticeText.replace(/<[^>]*>/g, "");
+      noticeDiv.textContent = noticeText;
       container.appendChild(noticeDiv);
     }
     actions.forEach((a, idx) => {
@@ -1076,14 +1081,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function maybeAppendTranscriptNotice() {
     if (!transcriptContainer || renderedTranscriptCount !== 0) return;
-    const noticeText = truncatedNoticeHtml(
+    const noticeText = truncatedNoticeText(
       "transcript entries",
       lastState?.truncatedCounts?.transcript,
     );
     if (!noticeText) return;
     const noticeDiv = document.createElement("div");
     noticeDiv.className = "truncated-notice";
-    noticeDiv.textContent = noticeText.replace(/<[^>]*>/g, "");
+    noticeDiv.textContent = noticeText;
     transcriptContainer.appendChild(noticeDiv);
   }
 
