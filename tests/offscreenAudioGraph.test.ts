@@ -33,16 +33,22 @@ class MockMediaStreamDestinationNode extends MockAudioNode {
 
 class MockAudioContext {
   readonly destination = new MockAudioNode();
-  readonly analyser = new MockAnalyserNode();
-  readonly recorderDestination = new MockMediaStreamDestinationNode();
+  readonly analysers: MockAnalyserNode[] = [];
+  readonly recorderDestinations: MockMediaStreamDestinationNode[] = [];
   readonly sources: MockSourceNode[] = [];
 
   createMediaStreamDestination(): MediaStreamAudioDestinationNode {
-    return this.recorderDestination as unknown as MediaStreamAudioDestinationNode;
+    const destination = new MockMediaStreamDestinationNode();
+    this.recorderDestinations.push(destination);
+
+    return destination as unknown as MediaStreamAudioDestinationNode;
   }
 
   createAnalyser(): AnalyserNode {
-    return this.analyser as unknown as AnalyserNode;
+    const analyser = new MockAnalyserNode();
+    this.analysers.push(analyser);
+
+    return analyser as unknown as AnalyserNode;
   }
 
   createMediaStreamSource(stream: MediaStream): MediaStreamAudioSourceNode {
@@ -61,17 +67,20 @@ function asAudioContext(context: MockAudioContext): AudioContext {
   return context as unknown as AudioContext;
 }
 
-test("creates one recorder destination and one analyser for tab capture", () => {
+test("creates exactly one recorder destination and one analyser for tab capture", () => {
   const context = new MockAudioContext();
   const tabStream = createMockStream("tab");
 
   const graph = createOffscreenAudioGraph(asAudioContext(context), tabStream);
 
-  assert.equal(graph.recorderDestination, context.recorderDestination);
-
-  assert.equal(graph.analyser, context.analyser);
-  assert.equal(graph.tabSource, context.sources[0]);
+  assert.equal(context.recorderDestinations.length, 1);
+  assert.equal(context.analysers.length, 1);
   assert.equal(context.sources.length, 1);
+
+  assert.equal(graph.recorderDestination, context.recorderDestinations[0]);
+
+  assert.equal(graph.analyser, context.analysers[0]);
+  assert.equal(graph.tabSource, context.sources[0]);
 });
 
 test("configures the analyser with the offscreen FFT size", () => {
@@ -79,9 +88,9 @@ test("configures the analyser with the offscreen FFT size", () => {
 
   createOffscreenAudioGraph(asAudioContext(context), createMockStream("tab"));
 
-  assert.equal(context.analyser.fftSize, OFFSCREEN_ANALYSER_FFT_SIZE);
+  assert.equal(context.analysers[0].fftSize, OFFSCREEN_ANALYSER_FFT_SIZE);
 
-  assert.equal(context.analyser.fftSize, 1024);
+  assert.equal(context.analysers[0].fftSize, 1024);
 });
 
 test("routes tab audio to recorder, analyser, and playback output", () => {
@@ -90,8 +99,8 @@ test("routes tab audio to recorder, analyser, and playback output", () => {
   createOffscreenAudioGraph(asAudioContext(context), createMockStream("tab"));
 
   assert.deepEqual(context.sources[0].connections, [
-    context.recorderDestination,
-    context.analyser,
+    context.recorderDestinations[0],
+    context.analysers[0],
     context.destination,
   ]);
 });
@@ -109,7 +118,10 @@ test("routes microphone audio to recorder and analyser", () => {
 
   assert.equal(microphoneSource, context.sources[1]);
 
-  assert.deepEqual(context.sources[1].connections, [context.recorderDestination, context.analyser]);
+  assert.deepEqual(context.sources[1].connections, [
+    context.recorderDestinations[0],
+    context.analysers[0],
+  ]);
 });
 
 test("does not route microphone audio to local playback", () => {
