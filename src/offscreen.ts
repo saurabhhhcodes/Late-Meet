@@ -1,5 +1,10 @@
 import { VoiceActivityTracker, isChunkViable } from "./audioProcessing";
 import { VAD_FFT_SIZE, computeRms, shouldRunVadAnalysis } from "./vadTuning";
+import {
+  connectMicrophoneToOffscreenAudioGraph,
+  createOffscreenAudioGraph,
+  MICROPHONE_AUDIO_CONSTRAINTS,
+} from "./offscreenAudioGraph";
 
 let mediaStream: MediaStream | null = null;
 let microphoneStream: MediaStream | null = null;
@@ -337,32 +342,13 @@ async function getTabAudioStream(streamId: string) {
 async function getMicrophoneStream() {
   try {
     return await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
+      audio: MICROPHONE_AUDIO_CONSTRAINTS,
       video: false,
     });
   } catch (err) {
     console.warn("[LateMeet][offscreen] Microphone capture unavailable:", err);
-
     return null;
   }
-}
-
-function connectSourceToRecorder(
-  stream: MediaStream,
-  destination: MediaStreamAudioDestinationNode,
-) {
-  if (!audioContext || !analyserNode) return;
-
-  const source = audioContext.createMediaStreamSource(stream);
-
-  source.connect(destination);
-  source.connect(analyserNode);
-
-  audioSources.push(source);
 }
 
 async function stopMediaRecorder() {
@@ -545,20 +531,23 @@ async function startCapture(
   analyserNode = audioContext.createAnalyser();
   analyserNode.fftSize = VAD_FFT_SIZE;
   analysisBuffer = new Uint8Array(analyserNode.fftSize);
+  const audioGraph = createOffscreenAudioGraph(audioContext, mediaStream);
+  const destination = audioGraph.recorderDestination;
 
-  const tabSource = audioContext.createMediaStreamSource(mediaStream);
-
-  tabSource.connect(destination);
-  tabSource.connect(analyserNode);
-  tabSource.connect(audioContext.destination);
-
-  audioSources.push(tabSource);
+  analyserNode = audioGraph.analyser;
+  audioSources.push(audioGraph.tabSource);
 
   if (includeMicrophone) {
     microphoneStream = await getMicrophoneStream();
 
     if (microphoneStream) {
-      connectSourceToRecorder(microphoneStream, destination);
+      const microphoneSource = connectMicrophoneToOffscreenAudioGraph(
+        audioContext,
+        microphoneStream,
+        audioGraph,
+      );
+
+      audioSources.push(microphoneSource);
 
       microphoneStream.getTracks().forEach((track) => {
         track.onended = () => {
