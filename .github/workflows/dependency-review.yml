@@ -23,3 +23,4 @@ jobs:
           fail-on-severity: critical
           comment-summary-in-pr: always
           deny-licenses: GPL-3.0, AGPL-3.0
+          allow-dependencies-licenses: pkg:githubactions/trufflesecurity/trufflehog
