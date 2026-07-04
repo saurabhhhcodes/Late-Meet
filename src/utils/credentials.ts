@@ -39,6 +39,7 @@ const IV_LENGTH = 12;
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_LENGTH = 16;
 const SALT_STORAGE_KEY = "credential_encryption_salt";
+const VAULT_VERIFICATION_KEY = "credential_vault_verification";
 
 let derivedKey: CryptoKey | null = null;
 
@@ -136,10 +137,16 @@ export async function unlockCredentials(passphrase: string): Promise<boolean> {
 
   if (typeof storedSalt === "string") {
     const key = await deriveKeyFromPassphrase(passphrase, base64ToArrayBuffer(storedSalt));
-    const encryptedLocal = await chrome.storage.local.get(CREDENTIAL_KEYS);
-    const encryptedCreds = unmarkEncrypted(encryptedLocal);
-    if (Object.keys(encryptedCreds).length > 0) {
-      try {
+    const stored = await chrome.storage.local.get([...CREDENTIAL_KEYS, VAULT_VERIFICATION_KEY]);
+    const encryptedCreds = unmarkEncrypted(stored);
+    const verificationToken = stored[VAULT_VERIFICATION_KEY];
+    try {
+      if (verificationToken && typeof verificationToken === "string") {
+        const combined = base64ToArrayBuffer(verificationToken);
+        const iv = new Uint8Array(combined.slice(0, IV_LENGTH));
+        const ciphertext = combined.slice(IV_LENGTH);
+        await crypto.subtle.decrypt({ name: AES_ALGORITHM, iv }, key, ciphertext);
+      } else {
         const sampleKey = CREDENTIAL_KEYS.find((k) => encryptedCreds[k]);
         if (sampleKey && encryptedCreds[sampleKey]) {
           const combined = base64ToArrayBuffer(encryptedCreds[sampleKey]);
@@ -147,9 +154,9 @@ export async function unlockCredentials(passphrase: string): Promise<boolean> {
           const ciphertext = combined.slice(IV_LENGTH);
           await crypto.subtle.decrypt({ name: AES_ALGORITHM, iv }, key, ciphertext);
         }
-      } catch {
-        return false;
       }
+    } catch {
+      return false;
     }
     derivedKey = key;
     resetAutoLockTimer();
@@ -164,8 +171,23 @@ export async function unlockCredentials(passphrase: string): Promise<boolean> {
   }
 
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  await chrome.storage.local.set({ [SALT_STORAGE_KEY]: arrayBufferToBase64(salt.buffer) });
   derivedKey = await deriveKeyFromPassphrase(passphrase, salt.buffer);
+
+  const verificationIv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const verificationPlaintext = new TextEncoder().encode("vault-verification-token");
+  const verificationCiphertext = await crypto.subtle.encrypt(
+    { name: AES_ALGORITHM, iv: verificationIv },
+    derivedKey,
+    verificationPlaintext,
+  );
+  const verificationCombined = new Uint8Array(verificationIv.length + verificationCiphertext.byteLength);
+  verificationCombined.set(verificationIv);
+  verificationCombined.set(new Uint8Array(verificationCiphertext), verificationIv.length);
+
+  await chrome.storage.local.set({
+    [SALT_STORAGE_KEY]: arrayBufferToBase64(salt.buffer),
+    [VAULT_VERIFICATION_KEY]: arrayBufferToBase64(verificationCombined.buffer),
+  });
   resetAutoLockTimer();
   return true;
 }
