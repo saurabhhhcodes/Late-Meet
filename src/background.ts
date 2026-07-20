@@ -1059,8 +1059,13 @@ function mergeUniqueStrings(existing: string[], incoming: unknown, maxSize = 500
 async function summarizeTranscriptIfNeeded() {
   if (!state.isActive || state.transcript.length === 0) return;
 
-  // Bail out immediately if another summarization is already running.
+  // Claim the in-flight slot synchronously *before* any `await`. The previous
+  // guard checked `summaryInFlight` here but only set it after several awaits,
+  // leaving a TOCTOU window where two concurrent triggers (e.g. a timer tick
+  // and a manual action) could both pass the guard and run in parallel, doubling
+  // API cost and racing the state writes (#739). Setting it now closes that gap.
   if (summaryInFlight) return;
+  summaryInFlight = true;
 
   const settings = await getSettings();
   const requestedInterval = Number(settings.summarizationInterval);
@@ -1071,10 +1076,16 @@ async function summarizeTranscriptIfNeeded() {
   if (intervalSeconds > 900) intervalSeconds = 900;
   const lastSum = state.lastSummarizedAt || 0;
   const elapsed = Math.floor((Date.now() - lastSum) / 1000);
-  if (lastSum > 0 && elapsed < intervalSeconds) return;
+  if (lastSum > 0 && elapsed < intervalSeconds) {
+    summaryInFlight = false;
+    return;
+  }
 
   const apiKey = await getApiKey();
-  if (!apiKey) return;
+  if (!apiKey) {
+    summaryInFlight = false;
+    return;
+  }
 
   const transcriptWindow = state.transcript
     .slice(-TRANSCRIPT_WINDOW_SIZE)
@@ -1084,10 +1095,10 @@ async function summarizeTranscriptIfNeeded() {
       return `[${chunkId}] [${timestampLabel}] ${sanitizePromptText(e.speaker)}: ${sanitizePromptText(e.text)}`;
     })
     .join("\n");
-  if (!transcriptWindow.trim()) return;
-
-  // Claim the in-flight slot *after* all cheap pre-checks pass.
-  summaryInFlight = true;
+  if (!transcriptWindow.trim()) {
+    summaryInFlight = false;
+    return;
+  }
 
   try {
     const topicDetectionEnabled = isFeatureEnabled(settings, "topicDetection");
