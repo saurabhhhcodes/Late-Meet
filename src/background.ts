@@ -2277,11 +2277,23 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 function createContextMenu() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: "transcribe-tab",
-      title: "🎙️ Transcribe current tab with Late-Meet",
-      contexts: ["page"],
-    });
+    chrome.contextMenus.create(
+      {
+        id: "transcribe-tab",
+        title: "🎙️ Transcribe current tab with Late-Meet",
+        contexts: ["page"],
+      },
+      () => {
+        // Surface failures (e.g. duplicate registration or restricted contexts)
+        // instead of silently swallowing them (#786).
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "[LateMeet] Failed to create context menu:",
+            chrome.runtime.lastError.message,
+          );
+        }
+      },
+    );
   });
 }
 
