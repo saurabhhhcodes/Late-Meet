@@ -172,3 +172,39 @@ test("audio chunk queue handles large backlog without rejection when capacity al
 
   assert.equal(processed.length, 1000);
 });
+
+test("audio chunk queue fires onDrain when the queue fills mid-drain", async () => {
+  const gate = deferred<void>();
+  const processed: string[] = [];
+  let drainCalls = 0;
+  const queue = new AudioChunkQueue<string>({
+    maxPending: 2,
+    process: async ({ item }) => {
+      await gate.promise;
+      processed.push(item);
+    },
+    onDrain: () => {
+      drainCalls += 1;
+    },
+  });
+
+  // Drain starts with the queue NOT full (a single item), then fills to
+  // capacity during processing. Capturing `wasFull` only before the loop
+  // (see issue #778) would miss this and never fire onDrain.
+  queue.enqueue("first");
+  queue.enqueue("second");
+  queue.enqueue("third");
+  await Promise.resolve();
+
+  assert.equal(drainCalls, 0);
+
+  gate.resolve();
+
+  while (queue.isProcessing) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  assert.deepEqual(processed, ["first", "second", "third"]);
+  assert.equal(queue.pending, 0);
+  assert.equal(drainCalls, 1);
+});

@@ -74,10 +74,18 @@ export class AudioChunkQueue<T> {
     if (this.processing) return;
 
     this.processing = true;
-    const wasFull = this.pendingItems.length >= this.maxPending;
+    // Capture whether the queue started full so we know to fire onDrain once it
+    // drains back below the cap. enqueue() may push more items (and the queue
+    // may briefly become full again) while we await processing, so re-check the
+    // fullness at the end rather than relying solely on the initial snapshot.
+    let becameFull = this.pendingItems.length >= this.maxPending;
 
     try {
       while (this.pendingItems.length > 0) {
+        if (this.pendingItems.length >= this.maxPending) {
+          becameFull = true;
+        }
+
         const entry = this.pendingItems.shift();
         if (!entry) continue;
 
@@ -93,7 +101,7 @@ export class AudioChunkQueue<T> {
       }
     } finally {
       this.processing = false;
-      if (wasFull && this.pendingItems.length < this.maxPending) {
+      if (becameFull && this.pendingItems.length < this.maxPending) {
         this.onDrain?.();
       }
     }
