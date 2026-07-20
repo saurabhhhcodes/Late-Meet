@@ -101,3 +101,8 @@ test("case-insensitive control labels are rejected", () => {
   assert.equal(participantNameFromCandidate({ selfName: "mute" }), null);
   assert.equal(participantNameFromCandidate({ selfName: "Camera Off" }), null);
 });
+
+test("nullish candidate does not throw", () => {
+  assert.equal(participantNameFromCandidate(null), null);
+  assert.equal(participantNameFromCandidate(undefined), null);
+});
