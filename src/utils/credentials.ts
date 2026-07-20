@@ -39,6 +39,7 @@ const IV_LENGTH = 12;
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_LENGTH = 16;
 const SALT_STORAGE_KEY = "credential_encryption_salt";
+const VAULT_VERIFICATION_KEY = "credential_vault_verification";
 
 let derivedKey: CryptoKey | null = null;
 
@@ -138,19 +139,57 @@ export async function unlockCredentials(passphrase: string): Promise<boolean> {
     const key = await deriveKeyFromPassphrase(passphrase, base64ToArrayBuffer(storedSalt));
     const encryptedLocal = await chrome.storage.local.get(CREDENTIAL_KEYS);
     const encryptedCreds = unmarkEncrypted(encryptedLocal);
-    if (Object.keys(encryptedCreds).length > 0) {
-      try {
+    const stored = await chrome.storage.local.get([VAULT_VERIFICATION_KEY]);
+    const verificationToken = stored[VAULT_VERIFICATION_KEY];
+    let verified = false;
+    try {
+      if (verificationToken && typeof verificationToken === "string") {
+        // Preferred path: a verification token is the canonical secret used to
+        // validate the passphrase for both populated and empty vaults.
+        const combined = base64ToArrayBuffer(verificationToken);
+        const iv = new Uint8Array(combined.slice(0, IV_LENGTH));
+        const ciphertext = combined.slice(IV_LENGTH);
+        await crypto.subtle.decrypt({ name: AES_ALGORITHM, iv }, key, ciphertext);
+        verified = true;
+      } else if (Object.keys(encryptedCreds).length > 0) {
+        // Fallback for vaults created before the verification token existed:
+        // validate against a sample credential instead.
         const sampleKey = CREDENTIAL_KEYS.find((k) => encryptedCreds[k]);
         if (sampleKey && encryptedCreds[sampleKey]) {
           const combined = base64ToArrayBuffer(encryptedCreds[sampleKey]);
           const iv = new Uint8Array(combined.slice(0, IV_LENGTH));
           const ciphertext = combined.slice(IV_LENGTH);
           await crypto.subtle.decrypt({ name: AES_ALGORITHM, iv }, key, ciphertext);
+          verified = true;
         }
-      } catch {
-        return false;
+      } else {
+        // The vault salt exists but the vault is empty: no verification token and
+        // no stored credentials. The original code accepted *any* passphrase here
+        // and cached its derived key, so a subsequent save encrypted with the wrong
+        // key and permanently locked the user out (#837). Treat this as an
+        // incomplete first-time setup and persist a verification token derived from
+        // this passphrase so future unlocks can be validated against it.
+        const verificationIv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+        const verificationPlaintext = new TextEncoder().encode("vault-verification-token");
+        const verificationCiphertext = await crypto.subtle.encrypt(
+          { name: AES_ALGORITHM, iv: verificationIv },
+          key,
+          verificationPlaintext,
+        );
+        const verificationCombined = new Uint8Array(
+          verificationIv.length + verificationCiphertext.byteLength,
+        );
+        verificationCombined.set(verificationIv);
+        verificationCombined.set(new Uint8Array(verificationCiphertext), verificationIv.length);
+        await chrome.storage.local.set({
+          [VAULT_VERIFICATION_KEY]: arrayBufferToBase64(verificationCombined.buffer),
+        });
+        verified = true;
       }
+    } catch {
+      return false;
     }
+    if (!verified) return false;
     derivedKey = key;
     resetAutoLockTimer();
     return true;

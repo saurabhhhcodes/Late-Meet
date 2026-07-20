@@ -252,3 +252,31 @@ test("saving partial credentials does not wipe out omitted keys", async () => {
 after(() => {
   lockCredentials();
 });
+
+test("unlock of an initialized-but-empty vault persists a verification token (#837)", async () => {
+  // Vault salt exists (initialized) but no credentials: the old code accepted ANY
+  // passphrase here and cached the wrong derived key, locking the user out later.
+  const { local } = setupChromeStorage(
+    { openai_api_key: "existing-openai" },
+    {
+      credential_encryption_salt: "c2FsdHktcGxhY2Vob2xkZXI=",
+      openai_api_key: "existing-openai",
+    },
+  );
+
+  const result = await unlockCredentials("chosen-passphrase");
+  assert.equal(result, true);
+
+  // A verification token must now exist so future unlocks can be validated.
+  assert.ok(typeof local.credential_vault_verification === "string");
+  assert.ok((local.credential_vault_verification as string).length > 0);
+
+  // Re-unlock with the SAME passphrase succeeds, and with a DIFFERENT passphrase
+  // is rejected — proving the key is now verifiable, not any-phrase.
+  lockCredentials();
+  assert.equal(isUnlocked(), false);
+  assert.equal(await unlockCredentials("chosen-passphrase"), true);
+
+  lockCredentials();
+  assert.equal(await unlockCredentials("some-other-passphrase"), false);
+});
