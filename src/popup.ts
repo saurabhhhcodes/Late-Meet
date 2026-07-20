@@ -105,6 +105,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!apiKey) {
       shakeElement(apiKeyInput);
+      let errorEl = document.getElementById("api-key-error");
+      if (!errorEl) {
+        errorEl = document.createElement("div");
+        errorEl.id = "api-key-error";
+        errorEl.className = "status-text status-danger";
+        errorEl.style.fontSize = "11px";
+        errorEl.style.marginTop = "6px";
+        errorEl.style.textAlign = "left";
+        apiKeyInput.parentNode?.appendChild(errorEl);
+      }
+      errorEl.textContent = "API key cannot be empty.";
       return;
     }
     //Validation.
@@ -150,6 +161,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("toggle-key")?.addEventListener("click", () => {
     const input = document.getElementById("api-key-input") as HTMLInputElement;
     input.type = input.type === "password" ? "text" : "password";
+  });
+
+  // Clear the inline validation message as soon as the user starts typing.
+  document.getElementById("api-key-input")?.addEventListener("input", () => {
+    document.getElementById("api-key-error")?.remove();
   });
 
   // ——— Settings ———
